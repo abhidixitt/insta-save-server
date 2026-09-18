@@ -36,7 +36,55 @@ class DownloadHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
 
-        # Health check
+        # Temporary format diagnostic endpoint.
+        if parsed.path == "/formats":
+            query = urllib.parse.parse_qs(parsed.query)
+            url = query.get("url", [""])[0].strip()
+
+            if not url:
+                self._send_json(
+                    400,
+                    {"error": "Instagram URL is required."},
+                )
+                return
+
+            if not self._is_instagram_url(url):
+                self._send_json(
+                    400,
+                    {"error": "Invalid Instagram URL."},
+                )
+                return
+
+            try:
+                self._debug_formats(url)
+
+                self._send_json(
+                    200,
+                    {
+                        "status": (
+                            "Format check completed. "
+                            "See server logs."
+                        )
+                    },
+                )
+
+            except subprocess.TimeoutExpired:
+                self._send_json(
+                    500,
+                    {"error": "Format check timed out."},
+                )
+
+            except Exception as e:
+                print(f"[!] Format check error: {e}")
+
+                self._send_json(
+                    500,
+                    {"error": "Format check failed."},
+                )
+
+            return
+
+        # Health check.
         if parsed.path in ("/", "/health"):
             self._send_json(
                 200,
@@ -47,7 +95,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
             )
             return
 
-        # Serve downloaded file
+        # Serve downloaded file.
         if parsed.path.startswith("/file/"):
             self._serve_file(parsed.path)
             return
@@ -56,6 +104,45 @@ class DownloadHandler(BaseHTTPRequestHandler):
             404,
             {"error": "Not found"},
         )
+
+    def _debug_formats(self, url):
+        print()
+        print("[+] Checking Instagram formats...")
+        print(url)
+
+        command = [
+            "yt-dlp",
+            "--verbose",
+            "--no-playlist",
+            "-F",
+            url,
+        ]
+
+        print("[+] Running format check...")
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        print()
+        print("=== FORMAT CHECK OUTPUT ===")
+
+        if result.stdout:
+            print(result.stdout)
+
+        if result.stderr:
+            print(result.stderr)
+
+        print("=== END FORMAT CHECK OUTPUT ===")
+        print()
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                "yt-dlp format check failed."
+            )
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -86,8 +173,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 self._send_json(
                     400,
                     {
-                        "error":
-                            "Instagram URL is required.",
+                        "error": "Instagram URL is required.",
                     },
                 )
                 return
@@ -279,7 +365,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
         try:
             command = [
                 "yt-dlp",
-                   "--verbose",
+                "--verbose",
                 "--no-playlist",
 
                 # Explicitly request the best
