@@ -1,4 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
 import json
 import os
 import shutil
@@ -21,10 +22,15 @@ class DownloadHandler(BaseHTTPRequestHandler):
         body = json.dumps(data).encode("utf-8")
 
         self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8",
+        )
+        self.send_header(
+            "Content-Length",
+            str(len(body)),
+        )
         self.end_headers()
-
         self.wfile.write(body)
 
     def do_GET(self):
@@ -46,28 +52,43 @@ class DownloadHandler(BaseHTTPRequestHandler):
             self._serve_file(parsed.path)
             return
 
-        self._send_json(404, {"error": "Not found"})
+        self._send_json(
+            404,
+            {"error": "Not found"},
+        )
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
 
         if parsed.path != "/download":
-            self._send_json(404, {"error": "Not found"})
+            self._send_json(
+                404,
+                {"error": "Not found"},
+            )
             return
 
         try:
-            content_length = int(self.headers.get("Content-Length", "0"))
+            content_length = int(
+                self.headers.get("Content-Length", "0")
+            )
 
             raw_body = self.rfile.read(content_length)
 
-            body = json.loads(raw_body.decode("utf-8"))
+            body = json.loads(
+                raw_body.decode("utf-8")
+            )
 
-            url = str(body.get("url", "")).strip()
+            url = str(
+                body.get("url", "")
+            ).strip()
 
             if not url:
                 self._send_json(
                     400,
-                    {"error": "Instagram URL is required."},
+                    {
+                        "error":
+                            "Instagram URL is required.",
+                    },
                 )
                 return
 
@@ -76,14 +97,15 @@ class DownloadHandler(BaseHTTPRequestHandler):
                     400,
                     {
                         "error": (
-                            "Only Instagram post and Reel URLs are supported."
+                            "Only Instagram post and "
+                            "Reel URLs are supported."
                         )
                     },
                 )
                 return
 
             print()
-            print(f"[+] Download requested:")
+            print("[+] Download requested:")
             print(url)
 
             file_path = self._download(url)
@@ -93,7 +115,8 @@ class DownloadHandler(BaseHTTPRequestHandler):
                     500,
                     {
                         "error": (
-                            "yt-dlp did not produce a downloadable file."
+                            "yt-dlp did not produce "
+                            "a downloadable file."
                         )
                     },
                 )
@@ -101,7 +124,11 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
             file_name = os.path.basename(file_path)
 
-            print(f"[+] Download complete: {file_name}")
+            print(
+                f"[+] Download complete: {file_name}"
+            )
+
+            self._check_audio_stream(file_path)
 
             self._send_json(
                 200,
@@ -109,7 +136,8 @@ class DownloadHandler(BaseHTTPRequestHandler):
                     "status": "success",
                     "fileName": file_name,
                     "downloadUrl": (
-                        "/file/" + urllib.parse.quote(file_name)
+                        "/file/"
+                        + urllib.parse.quote(file_name)
                     ),
                 },
             )
@@ -132,28 +160,45 @@ class DownloadHandler(BaseHTTPRequestHandler):
             self._send_json(
                 500,
                 {
-                    "error": "Download failed. Check the server console."
+                    "error": (
+                        "Download failed. "
+                        "Check the server console."
+                    )
                 },
             )
 
     def _serve_file(self, request_path):
         encoded_name = request_path[len("/file/"):]
-        file_name = urllib.parse.unquote(encoded_name)
+
+        file_name = urllib.parse.unquote(
+            encoded_name
+        )
 
         # Prevent directory traversal.
         safe_name = os.path.basename(file_name)
 
         if safe_name != file_name:
-            self._send_json(400, {"error": "Invalid file name."})
+            self._send_json(
+                400,
+                {"error": "Invalid file name."},
+            )
             return
 
-        file_path = os.path.join(DOWNLOAD_DIR, safe_name)
+        file_path = os.path.join(
+            DOWNLOAD_DIR,
+            safe_name,
+        )
 
         if not os.path.isfile(file_path):
-            self._send_json(404, {"error": "File not found."})
+            self._send_json(
+                404,
+                {"error": "File not found."},
+            )
             return
 
-        extension = os.path.splitext(file_path)[1].lower()
+        extension = os.path.splitext(
+            file_path
+        )[1].lower()
 
         content_types = {
             ".mp4": "video/mp4",
@@ -168,10 +213,16 @@ class DownloadHandler(BaseHTTPRequestHandler):
             "application/octet-stream",
         )
 
-        file_size = os.path.getsize(file_path)
+        file_size = os.path.getsize(
+            file_path
+        )
 
-        print(f"[+] Sending file: {safe_name}")
-        print(f"[+] Size: {file_size} bytes")
+        print(
+            f"[+] Sending file: {safe_name}"
+        )
+        print(
+            f"[+] Size: {file_size} bytes"
+        )
 
         try:
             with open(file_path, "rb") as file:
@@ -195,15 +246,23 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 self.end_headers()
 
                 while True:
-                    chunk = file.read(1024 * 1024)
+                    chunk = file.read(
+                        1024 * 1024
+                    )
 
                     if not chunk:
                         break
 
                     self.wfile.write(chunk)
 
-        except (BrokenPipeError, ConnectionResetError):
-            print("[!] Client disconnected while receiving file.")
+        except (
+            BrokenPipeError,
+            ConnectionResetError,
+        ):
+            print(
+                "[!] Client disconnected "
+                "while receiving file."
+            )
 
     def _download(self, url):
         job_id = uuid.uuid4().hex
@@ -220,17 +279,30 @@ class DownloadHandler(BaseHTTPRequestHandler):
         try:
             command = [
                 "yt-dlp",
+
                 "--no-playlist",
+
+                # Explicitly request the best
+                # separate video and audio streams.
                 "-f",
-                "bv*+ba/b",
+                "bestvideo+bestaudio/best",
+
+                # Merge the selected streams
+                # into an MP4 container.
                 "--merge-output-format",
                 "mp4",
+
                 "-o",
                 output_template,
+
                 url,
             ]
 
             print("[+] Running yt-dlp...")
+            print(
+                "[+] Format selector: "
+                "bestvideo+bestaudio/best"
+            )
 
             result = subprocess.run(
                 command,
@@ -239,14 +311,22 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 timeout=180,
             )
 
+            print()
+            print("=== yt-dlp OUTPUT ===")
+
             if result.stdout:
                 print(result.stdout)
 
-            if result.returncode != 0:
-                if result.stderr:
-                    print(result.stderr)
+            if result.stderr:
+                print(result.stderr)
 
-                raise RuntimeError("yt-dlp failed.")
+            print("=== END yt-dlp OUTPUT ===")
+            print()
+
+            if result.returncode != 0:
+                raise RuntimeError(
+                    "yt-dlp failed."
+                )
 
             files = []
 
@@ -305,6 +385,57 @@ class DownloadHandler(BaseHTTPRequestHandler):
             )
 
     @staticmethod
+    def _check_audio_stream(file_path):
+        """
+        Check whether the final downloaded MP4
+        actually contains an audio stream.
+        """
+
+        print("[+] Checking final MP4 audio stream...")
+
+        try:
+            result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "a:0",
+                    "-show_entries",
+                    "stream=codec_name",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            codec = result.stdout.strip()
+
+            if codec:
+                print(
+                    f"[+] Audio stream detected: {codec}"
+                )
+            else:
+                print(
+                    "[!] NO AUDIO STREAM detected "
+                    "in final MP4."
+                )
+
+        except FileNotFoundError:
+            print(
+                "[!] ffprobe is not available. "
+                "Could not check audio stream."
+            )
+
+        except Exception as e:
+            print(
+                f"[!] Audio check failed: {e}"
+            )
+
+    @staticmethod
     def _is_instagram_url(url):
         try:
             parsed = urllib.parse.urlparse(url)
@@ -345,8 +476,12 @@ if __name__ == "__main__":
     print("=" * 50)
     print("InstaSave Downloader Server")
     print("=" * 50)
-    print(f"Server: http://localhost:{PORT}")
-    print(f"Health: http://localhost:{PORT}/health")
+    print(
+        f"Server: http://localhost:{PORT}"
+    )
+    print(
+        f"Health: http://localhost:{PORT}/health"
+    )
     print("Press Ctrl+C to stop.")
     print("=" * 50)
     print()
