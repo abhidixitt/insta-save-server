@@ -162,18 +162,14 @@ class DownloadHandler(BaseHTTPRequestHandler):
             "yt-dlp",
             "--verbose",
             "--no-playlist",
-            "--user-agent",
-            (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/153.0.0.0 Safari/537.36"
-            ),
+            "--impersonate",
+            "Chrome-150",
             "-J",
             url,
         ]
 
         print("[+] Running metadata check...")
-        print("[+] User-Agent: Chrome 153 Windows")
+        print("[+] Impersonation: Chrome-150")
 
         result = subprocess.run(
             command,
@@ -237,11 +233,14 @@ class DownloadHandler(BaseHTTPRequestHandler):
             "yt-dlp",
             "--verbose",
             "--no-playlist",
+            "--impersonate",
+            "Chrome-150",
             "-F",
             url,
         ]
 
         print("[+] Running format check...")
+        print("[+] Impersonation: Chrome-150")
 
         result = subprocess.run(
             command,
@@ -491,6 +490,12 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 "--verbose",
                 "--no-playlist",
 
+                # Use the same browser impersonation
+                # that successfully exposed Instagram
+                # audio during the local test.
+                "--impersonate",
+                "Chrome-150",
+
                 # Explicitly request the best
                 # separate video and audio streams.
                 "-f",
@@ -508,6 +513,9 @@ class DownloadHandler(BaseHTTPRequestHandler):
             ]
 
             print("[+] Running yt-dlp...")
+            print(
+                "[+] Impersonation: Chrome-150"
+            )
             print(
                 "[+] Format selector: "
                 "bestvideo+bestaudio/best"
