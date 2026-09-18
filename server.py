@@ -279,7 +279,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
         try:
             command = [
                 "yt-dlp",
-
+                   "--verbose",
                 "--no-playlist",
 
                 # Explicitly request the best
