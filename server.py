@@ -222,7 +222,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 "yt-dlp",
                 "--no-playlist",
                 "-f",
-                "bestvideo+bestaudio/best",
+                "bv*+ba/b",
                 "--merge-output-format",
                 "mp4",
                 "-o",
