@@ -36,6 +36,54 @@ class DownloadHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
 
+        # Temporary metadata diagnostic endpoint.
+        if parsed.path == "/metadata":
+            query = urllib.parse.parse_qs(parsed.query)
+            url = query.get("url", [""])[0].strip()
+
+            if not url:
+                self._send_json(
+                    400,
+                    {"error": "Instagram URL is required."},
+                )
+                return
+
+            if not self._is_instagram_url(url):
+                self._send_json(
+                    400,
+                    {"error": "Invalid Instagram URL."},
+                )
+                return
+
+            try:
+                self._debug_metadata(url)
+
+                self._send_json(
+                    200,
+                    {
+                        "status": (
+                            "Metadata check completed. "
+                            "See server logs."
+                        )
+                    },
+                )
+
+            except subprocess.TimeoutExpired:
+                self._send_json(
+                    500,
+                    {"error": "Metadata check timed out."},
+                )
+
+            except Exception as e:
+                print(f"[!] Metadata check error: {e}")
+
+                self._send_json(
+                    500,
+                    {"error": "Metadata check failed."},
+                )
+
+            return
+
         # Temporary format diagnostic endpoint.
         if parsed.path == "/formats":
             query = urllib.parse.parse_qs(parsed.query)
@@ -104,6 +152,74 @@ class DownloadHandler(BaseHTTPRequestHandler):
             404,
             {"error": "Not found"},
         )
+
+    def _debug_metadata(self, url):
+        print()
+        print("[+] Checking Instagram raw metadata...")
+        print(url)
+
+        command = [
+            "yt-dlp",
+            "--verbose",
+            "--no-playlist",
+            "-J",
+            url,
+        ]
+
+        print("[+] Running metadata check...")
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        print()
+        print("=== RAW METADATA CHECK OUTPUT ===")
+
+        if result.stdout:
+            try:
+                data = json.loads(result.stdout)
+
+                formats = data.get("formats", [])
+
+                print(
+                    f"[+] Number of formats: {len(formats)}"
+                )
+
+                for media in formats:
+                    print(
+                        json.dumps(
+                            {
+                                "format_id": media.get("format_id"),
+                                "ext": media.get("ext"),
+                                "width": media.get("width"),
+                                "height": media.get("height"),
+                                "vcodec": media.get("vcodec"),
+                                "acodec": media.get("acodec"),
+                                "abr": media.get("abr"),
+                                "url_present": bool(
+                                    media.get("url")
+                                ),
+                            },
+                            ensure_ascii=False,
+                        )
+                    )
+
+            except json.JSONDecodeError:
+                print(result.stdout)
+
+        if result.stderr:
+            print(result.stderr)
+
+        print("=== END RAW METADATA CHECK OUTPUT ===")
+        print()
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                "yt-dlp metadata check failed."
+            )
 
     def _debug_formats(self, url):
         print()
