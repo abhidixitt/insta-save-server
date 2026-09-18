@@ -4,7 +4,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir yt-dlp
+RUN pip install --no-cache-dir yt-dlp curl-cffi
 
 WORKDIR /app
 
