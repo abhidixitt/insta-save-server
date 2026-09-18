@@ -162,11 +162,18 @@ class DownloadHandler(BaseHTTPRequestHandler):
             "yt-dlp",
             "--verbose",
             "--no-playlist",
+            "--user-agent",
+            (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/153.0.0.0 Safari/537.36"
+            ),
             "-J",
             url,
         ]
 
         print("[+] Running metadata check...")
+        print("[+] User-Agent: Chrome 153 Windows")
 
         result = subprocess.run(
             command,
