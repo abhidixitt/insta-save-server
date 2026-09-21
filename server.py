@@ -511,9 +511,9 @@ class DownloadHandler(BaseHTTPRequestHandler):
             convert_command = [
                 "ffmpeg",
                 "-i", input_file,
-                "-c:v", "libx264",     # Force H.264 (Universal Video)
+                "-c:v", "copy",      # Copy video as-is (FAST, no CPU usage)
                 "-c:a", "aac",       # Force Standard AAC (Universal Audio)
-                "-b:a", "128k",      # High quality standard bitrate
+                "-b:a", "128k",      # Standard bitrate
                 "-ac", "2",          # Force stereo
                 "-movflags", "+faststart", # Optimization for mobile playback
                 "-y",
