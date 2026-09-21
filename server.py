@@ -489,26 +489,18 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 "yt-dlp",
                 "--verbose",
                 "--no-playlist",
-
-                # Use the same browser impersonation
-                # that successfully exposed Instagram
-                # audio during the local test.
                 "--impersonate",
                 "Chrome-150",
-
-                # Explicitly request the best
-                # separate video and audio streams.
                 "-f",
                 "bestvideo+bestaudio/best",
-
-                # Merge the selected streams
-                # into an MP4 container.
+                # Force audio conversion to standard AAC to prevent "muted" videos
+                # on devices that don't support HE-AAC.
+                "--postprocessor-args",
+                "ffmpeg:-c:a aac -b:a 128k",
                 "--merge-output-format",
                 "mp4",
-
                 "-o",
                 output_template,
-
                 url,
             ]
 
