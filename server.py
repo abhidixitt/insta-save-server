@@ -475,47 +475,57 @@ class DownloadHandler(BaseHTTPRequestHandler):
     def _download(self, url):
         job_id = uuid.uuid4().hex
         temp_dir = tempfile.mkdtemp(prefix=f"instasave_{job_id}_")
-        output_template = os.path.join(temp_dir, "media.%(ext)s")
-
+        
         try:
-            # AGGRESSIVE DOWNLOAD STRATEGY
-            # 1. Try the best quality first with forced conversion
-            # 2. If that fails or we suspect muting, we use a broader format selector
+            # Step 1: Download the file using yt-dlp
+            # We use a simpler format selector to get the most reliable file first
+            input_template = os.path.join(temp_dir, "input.%(ext)s")
             command = [
                 "yt-dlp",
-                "--verbose",
                 "--no-playlist",
                 "--impersonate", "Chrome-150",
-                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "-f", "bestvideo+bestaudio/best",
                 "--merge-output-format", "mp4",
-                # Force a full re-encode of audio to a standard format to strip any 
-                # 'silent' flags or incompatible HE-AAC profiles.
-                "--postprocessor-args", "ffmpeg:-c:v copy -c:a aac -b:a 128k -ac 2",
-                "-o", output_template,
+                "-o", input_template,
                 url,
             ]
-
-            print(f"[+] Aggressive download started for: {url}")
+            
+            print(f"[+] Downloading raw media for: {url}")
             result = subprocess.run(command, capture_output=True, text=True, timeout=180)
-
             if result.returncode != 0:
-                print("[!] First attempt failed, trying fallback format...")
-                # Fallback: try a single merged format if separate streams failed
-                command[7] = "best" 
-                result = subprocess.run(command, capture_output=True, text=True, timeout=180)
+                raise RuntimeError("yt-dlp failed to download media.")
 
-            if result.returncode != 0:
-                raise RuntimeError("yt-dlp failed after fallback.")
-
+            # Find the downloaded file
             files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir)]
             if not files:
-                raise RuntimeError("No downloaded file was found.")
-
-            source_file = max(files, key=os.path.getsize)
+                raise RuntimeError("No file was downloaded.")
+            input_file = max(files, key=os.path.getsize)
+            
+            # Step 2: MANUALLY FORCE CONVERSION using FFmpeg
+            # This is the critical part. We bypass yt-dlp's internal logic
+            # and force a full rewrite of the audio and video streams.
             final_name = f"instasave_{job_id}.mp4"
             final_path = os.path.join(DOWNLOAD_DIR, final_name)
-            shutil.move(source_file, final_path)
-
+            
+            print(f"[+] Forcing universal compatibility conversion...")
+            convert_command = [
+                "ffmpeg",
+                "-i", input_file,
+                "-c:v", "libx264",     # Force H.264 (Universal Video)
+                "-c:a", "aac",       # Force Standard AAC (Universal Audio)
+                "-b:a", "128k",      # High quality standard bitrate
+                "-ac", "2",          # Force stereo
+                "-movflags", "+faststart", # Optimization for mobile playback
+                "-y",
+                final_path,
+            ]
+            
+            conv_result = subprocess.run(convert_command, capture_output=True, text=True, timeout=120)
+            if conv_result.returncode != 0:
+                print(f"[!] FFmpeg conversion failed: {conv_result.stderr}")
+                # Fallback: if conversion fails, try to just move the original
+                shutil.move(input_file, final_path)
+            
             return final_path
 
         finally:
