@@ -483,7 +483,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
             command = [
                 "yt-dlp",
                 "--no-playlist",
-                "--impersonate", "Chrome-150",
+                "--user-agent", "Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
                 "-f", "bestvideo+bestaudio/best",
                 "--merge-output-format", "mp4",
                 "-o", input_template,
