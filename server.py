@@ -493,10 +493,10 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 "Chrome-150",
                 "-f",
                 "bestvideo+bestaudio/best",
-                # Force audio conversion to standard AAC to prevent "muted" videos
-                # on devices that don't support HE-AAC.
+                # Ensure maximum compatibility for all mobile devices
+                # Convert video to h264 and audio to standard aac
                 "--postprocessor-args",
-                "ffmpeg:-c:a aac -b:a 128k",
+                "ffmpeg:-c:v libx264 -c:a aac -b:a 128k",
                 "--merge-output-format",
                 "mp4",
                 "-o",
