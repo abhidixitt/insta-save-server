@@ -474,124 +474,52 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
     def _download(self, url):
         job_id = uuid.uuid4().hex
-
-        temp_dir = tempfile.mkdtemp(
-            prefix=f"instasave_{job_id}_"
-        )
-
-        output_template = os.path.join(
-            temp_dir,
-            "media.%(ext)s",
-        )
+        temp_dir = tempfile.mkdtemp(prefix=f"instasave_{job_id}_")
+        output_template = os.path.join(temp_dir, "media.%(ext)s")
 
         try:
+            # AGGRESSIVE DOWNLOAD STRATEGY
+            # 1. Try the best quality first with forced conversion
+            # 2. If that fails or we suspect muting, we use a broader format selector
             command = [
                 "yt-dlp",
                 "--verbose",
                 "--no-playlist",
-                "--impersonate",
-                "Chrome-150",
-                "-f",
-                "bestvideo+bestaudio/best",
-                # Ensure maximum compatibility for all mobile devices
-                # Convert video to h264 and audio to standard aac
-                "--postprocessor-args",
-                "ffmpeg:-c:v libx264 -c:a aac -b:a 128k",
-                "--merge-output-format",
-                "mp4",
-                "-o",
-                output_template,
+                "--impersonate", "Chrome-150",
+                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--merge-output-format", "mp4",
+                # Force a full re-encode of audio to a standard format to strip any 
+                # 'silent' flags or incompatible HE-AAC profiles.
+                "--postprocessor-args", "ffmpeg:-c:v copy -c:a aac -b:a 128k -ac 2",
+                "-o", output_template,
                 url,
             ]
 
-            print("[+] Running yt-dlp...")
-            print(
-                "[+] Impersonation: Chrome-150"
-            )
-            print(
-                "[+] Format selector: "
-                "bestvideo+bestaudio/best"
-            )
-
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=180,
-            )
-
-            print()
-            print("=== yt-dlp OUTPUT ===")
-
-            if result.stdout:
-                print(result.stdout)
-
-            if result.stderr:
-                print(result.stderr)
-
-            print("=== END yt-dlp OUTPUT ===")
-            print()
+            print(f"[+] Aggressive download started for: {url}")
+            result = subprocess.run(command, capture_output=True, text=True, timeout=180)
 
             if result.returncode != 0:
-                raise RuntimeError(
-                    "yt-dlp failed."
-                )
+                print("[!] First attempt failed, trying fallback format...")
+                # Fallback: try a single merged format if separate streams failed
+                command[7] = "best" 
+                result = subprocess.run(command, capture_output=True, text=True, timeout=180)
 
-            files = []
+            if result.returncode != 0:
+                raise RuntimeError("yt-dlp failed after fallback.")
 
-            for name in os.listdir(temp_dir):
-                full_path = os.path.join(
-                    temp_dir,
-                    name,
-                )
-
-                if os.path.isfile(full_path):
-                    files.append(full_path)
-
+            files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir)]
             if not files:
-                raise RuntimeError(
-                    "No downloaded file was found."
-                )
+                raise RuntimeError("No downloaded file was found.")
 
-            source_file = max(
-                files,
-                key=os.path.getsize,
-            )
-
-            extension = os.path.splitext(
-                source_file
-            )[1].lower()
-
-            if extension not in {
-                ".mp4",
-                ".jpg",
-                ".jpeg",
-                ".png",
-                ".webp",
-            }:
-                extension = ".mp4"
-
-            final_name = (
-                f"instasave_{job_id}{extension}"
-            )
-
-            final_path = os.path.join(
-                DOWNLOAD_DIR,
-                final_name,
-            )
-
-            shutil.move(
-                source_file,
-                final_path,
-            )
+            source_file = max(files, key=os.path.getsize)
+            final_name = f"instasave_{job_id}.mp4"
+            final_path = os.path.join(DOWNLOAD_DIR, final_name)
+            shutil.move(source_file, final_path)
 
             return final_path
 
         finally:
-            shutil.rmtree(
-                temp_dir,
-                ignore_errors=True,
-            )
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     @staticmethod
     def _check_audio_stream(file_path):
