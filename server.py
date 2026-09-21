@@ -505,29 +505,28 @@ class DownloadHandler(BaseHTTPRequestHandler):
                 raise RuntimeError("No file was downloaded.")
             input_file = max(files, key=os.path.getsize)
             
-            # Step 2: MANUALLY FORCE HARD-CONVERSION using FFmpeg
-            # We rebuild the file from scratch to ensure 100% compatibility.
+            # Step 2: SAFE CONVERSION using FFmpeg
+            # We copy the video to avoid Render's CPU limits (preventing 502 errors)
+            # but we force the audio to Standard AAC for mobile compatibility.
             final_name = f"instasave_{job_id}.mp4"
             final_path = os.path.join(DOWNLOAD_DIR, final_name)
             
-            print(f"[+] Performing hard-conversion to Universal MP4...")
+            print(f"[+] Performing safe compatibility conversion...")
             convert_command = [
                 "ffmpeg",
                 "-i", input_file,
-                "-c:v", "libx264",     # Re-encode video to standard H.264
-                "-preset", "fast",     # Balance speed and compatibility
-                "-c:a", "aac",       # Force Standard AAC (NOT HE-AAC)
+                "-c:v", "copy",       # Copy video as-is to prevent CPU spikes
+                "-c:a", "aac",       # Force Standard AAC (Universal Audio)
                 "-b:a", "128k",      # Standard bitrate
                 "-ac", "2",          # Force stereo
-                "-ar", "44100",      # Force standard sample rate
                 "-movflags", "+faststart", 
                 "-y",
                 final_path,
             ]
             
-            conv_result = subprocess.run(convert_command, capture_output=True, text=True, timeout=180)
+            conv_result = subprocess.run(convert_command, capture_output=True, text=True, timeout=120)
             if conv_result.returncode != 0:
-                print(f"[!] Hard-conversion failed: {conv_result.stderr}")
+                print(f"[!] FFmpeg conversion failed: {conv_result.stderr}")
                 shutil.move(input_file, final_path)
             
             return final_path
